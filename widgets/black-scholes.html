@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Black-Scholes</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#e2e2e2;--accent:#5e5ce6;--good:#3aa675;}
+  @media (prefers-color-scheme:dark){:root{--bg:#1e1e2e;--fg:#e8e8e8;--muted:#9a9a9a;--line:#3a3a4a;--accent:#a5a3ff;--good:#57c99a;}}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:12px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px 16px;margin-bottom:10px;}
+  .f label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;}
+  .f input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font-size:14px;}
+  #plot{width:100%;height:230px;}
+  .out{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}
+  .card{border:1px solid var(--line);border-radius:8px;padding:9px;text-align:center;}
+  .card .k{font-size:10.5px;color:var(--muted);} .card .v{font-size:17px;font-weight:700;margin-top:2px;}
+  .card .v.accent{color:var(--accent);}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="f"><label>Prix sous-jacent S</label><input id="s" type="number" step="0.25" value="40.75"></div>
+    <div class="f"><label>Strike K</label><input id="k" type="number" step="0.25" value="40"></div>
+    <div class="f"><label>Échéance T (années)</label><input id="t" type="number" step="0.05" value="0.3644"></div>
+    <div class="f"><label>Taux sans risque r (%)</label><input id="r" type="number" step="0.1" value="3.81"></div>
+    <div class="f"><label>Volatilité σ (%)</label><input id="sig" type="number" step="1" value="52"></div>
+  </div>
+  <div id="plot"></div>
+  <div class="out">
+    <div class="card"><div class="k">d₁</div><div class="v" id="o_d1">—</div></div>
+    <div class="card"><div class="k">d₂</div><div class="v" id="o_d2">—</div></div>
+    <div class="card"><div class="k">Prix du Call</div><div class="v accent" id="o_c">—</div></div>
+    <div class="card"><div class="k">Prix du Put (parité)</div><div class="v" id="o_p">—</div></div>
+  </div>
+  <div class="note" id="note"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ids=["s","k","t","r","sig"];
+function ncdf(x){
+  const t=1/(1+0.2316419*Math.abs(x));
+  const d=0.3989422804014327*Math.exp(-x*x/2);
+  let p=d*t*(0.31938153+t*(-0.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429))));
+  return x>0 ? 1-p : p;
+}
+function bsCall(S,K,T,r,sig){
+  if(T<=0||sig<=0) return Math.max(S-K,0);
+  const d2=(Math.log(S/K)+(r-sig*sig/2)*T)/(sig*Math.sqrt(T));
+  const d1=d2+sig*Math.sqrt(T);
+  return {C:S*ncdf(d1)-K*Math.exp(-r*T)*ncdf(d2), d1, d2};
+}
+function compute(){
+  const S=+$("s").value,K=+$("k").value,T=+$("t").value,r=+$("r").value/100,sig=+$("sig").value/100;
+  const {C,d1,d2}=bsCall(S,K,T,r,sig);
+  const P=C-S+K*Math.exp(-r*T);
+  $("o_d1").textContent=d1.toFixed(4);
+  $("o_d2").textContent=d2.toFixed(4);
+  $("o_c").textContent=C.toFixed(2);
+  $("o_p").textContent=P.toFixed(2);
+
+  // prix du call vs volatilité
+  const xs=[],ys=[];
+  for(let v=1;v<=120;v+=2){ xs.push(v); ys.push(bsCall(S,K,T,r,v/100).C); }
+  const dark=window.matchMedia("(prefers-color-scheme:dark)").matches;
+  Plotly.react("plot",
+    [{x:xs,y:ys,mode:"lines",line:{color:"#5e5ce6",width:3},hovertemplate:"σ=%{x}%<br>call %{y:.2f}<extra></extra>"},
+     {x:[sig*100],y:[C],mode:"markers",marker:{size:11,color:"#e8453d"},hoverinfo:"skip"}],
+    {margin:{l:42,r:10,t:8,b:32},paper_bgcolor:"rgba(0,0,0,0)",plot_bgcolor:"rgba(0,0,0,0)",
+     font:{color:dark?"#e8e8e8":"#1a1a1a",size:11},showlegend:false,
+     xaxis:{title:"Volatilité σ (%)",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false},
+     yaxis:{title:"Prix du call",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false}},
+    {displayModeBar:false,responsive:true});
+
+  $("note").innerHTML="La seule donnée de marché requise (hors contrat) est le <b>taux sans risque</b> et la <b>volatilité</b> — pas le rendement espéré du sous-jacent, donc <b>pas de CAPM</b>. La courbe montre la statique comparative : le prix du call <b>croît avec la volatilité</b>.";
+}
+ids.forEach(id=>$(id).addEventListener("input",compute));
+compute();
+</script>
+</body>
+</html>

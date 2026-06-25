@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gordon & PVGO</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#e2e2e2;--accent:#5e5ce6;--good:#3aa675;--bad:#e8453d;}
+  @media (prefers-color-scheme:dark){:root{--bg:#1e1e2e;--fg:#e8e8e8;--muted:#9a9a9a;--line:#3a3a4a;--accent:#a5a3ff;--good:#57c99a;--bad:#f0726a;}}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:12px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px;margin-bottom:10px;}
+  .f label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;}
+  .f .val{color:var(--accent);font-weight:600;}
+  .f input[type=number]{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font-size:14px;}
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  #plot{width:100%;height:250px;}
+  .out{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}
+  .card{border:1px solid var(--line);border-radius:8px;padding:9px;text-align:center;}
+  .card .k{font-size:10.5px;color:var(--muted);} .card .v{font-size:17px;font-weight:700;margin-top:2px;}
+  .verdict{margin-top:10px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;text-align:center;}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="f"><label>EPS₁ (bénéfice/action)</label><input id="eps" type="number" step="0.1" value="8.33"></div>
+    <div class="f"><label>ROE (%)</label><input id="roe" type="number" step="1" value="25"></div>
+    <div class="f"><label>Rendement requis r̄ (%)</label><input id="r" type="number" step="0.5" value="15"></div>
+    <div class="f"><label>Taux de distribution (payout) : <span class="val" id="l_p">60%</span></label><input type="range" id="p" min="0" max="100" step="5" value="60"></div>
+  </div>
+
+  <div id="plot"></div>
+
+  <div class="out">
+    <div class="card"><div class="k">Croissance g</div><div class="v" id="o_g">—</div></div>
+    <div class="card"><div class="k">Prix P₀</div><div class="v accent" id="o_p">—</div></div>
+    <div class="card"><div class="k">Valeur sans croissance</div><div class="v" id="o_ng">—</div></div>
+    <div class="card"><div class="k">PVGO</div><div class="v" id="o_pvgo">—</div></div>
+  </div>
+  <div class="verdict" id="verdict"></div>
+  <div class="note" id="note"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ids=["eps","roe","r","p"];
+function priceAt(eps,roe,r,payout){
+  const b=1-payout; const g=roe*b; const D1=eps*payout;
+  if(g>=r) return null;
+  return D1/(r-g);
+}
+function compute(){
+  const eps=+$("eps").value, roe=+$("roe").value/100, r=+$("r").value/100, payout=+$("p").value/100;
+  $("l_p").textContent=(payout*100).toFixed(0)+"%";
+  const b=1-payout, g=roe*b, D1=eps*payout;
+  const P0 = g<r ? D1/(r-g) : null;
+  const noG = eps/r;
+  const PVGO = P0!==null ? P0-noG : null;
+
+  $("o_g").textContent=(g*100).toFixed(1)+"%";
+  $("o_p").textContent = P0!==null ? P0.toFixed(2) : "∞ (g≥r̄)";
+  $("o_ng").textContent=noG.toFixed(2);
+  $("o_pvgo").textContent = PVGO!==null ? ((PVGO>=0?"+":"")+PVGO.toFixed(2)) : "—";
+  $("o_pvgo").style.color = (PVGO!==null && PVGO>=0)?"var(--good)":"var(--bad)";
+
+  const v=$("verdict");
+  if(roe>r){ v.style.background="rgba(58,166,117,.15)"; v.style.color="var(--good)";
+    v.textContent="ROE > r̄ : réinvestir CRÉE de la valeur → PVGO positif, P/E élevé"; }
+  else if(roe<r){ v.style.background="rgba(232,69,61,.15)"; v.style.color="var(--bad)";
+    v.textContent="ROE < r̄ : réinvestir DÉTRUIT de la valeur → PVGO négatif"; }
+  else { v.style.background="rgba(94,92,230,.15)"; v.style.color="var(--accent)";
+    v.textContent="ROE = r̄ : la croissance est NPV nulle → le payout n'a aucun effet sur le prix (cas Dell)"; }
+
+  // courbe P0 vs payout
+  const xs=[],ys=[];
+  for(let pp=0;pp<=100;pp+=2){ const P=priceAt(eps,roe,r,pp/100); xs.push(pp); ys.push(P); }
+  const dark=window.matchMedia("(prefers-color-scheme:dark)").matches;
+  Plotly.react("plot",
+    [{x:xs,y:ys,mode:"lines",line:{color:"#5e5ce6",width:3},connectgaps:false,
+      hovertemplate:"payout %{x}%<br>P₀ %{y:.2f}<extra></extra>"},
+     {x:[payout*100],y:[P0],mode:"markers",marker:{size:11,color:"#e8453d"},hoverinfo:"skip"}],
+    {margin:{l:46,r:10,t:8,b:32},paper_bgcolor:"rgba(0,0,0,0)",plot_bgcolor:"rgba(0,0,0,0)",
+     font:{color:dark?"#e8e8e8":"#1a1a1a",size:11},showlegend:false,
+     xaxis:{title:"Taux de distribution (payout, %)",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false},
+     yaxis:{title:"Prix P₀",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false}},
+    {displayModeBar:false,responsive:true});
+
+  $("note").innerHTML=`Regarde la pente de la courbe : si <b>ROE &gt; r̄</b>, baisser le payout (réinvestir plus) <b>augmente</b> le prix ; si <b>ROE &lt; r̄</b>, c'est l'inverse ; si ROE = r̄, la courbe est <b>plate</b>. `+
+    `P₀ = EPS₁/r̄ + PVGO : le prix se décompose en valeur des actifs en place plus valeur des opportunités de croissance.`;
+}
+ids.forEach(id=>$(id).addEventListener("input",compute));
+compute();
+</script>
+</body>
+</html>

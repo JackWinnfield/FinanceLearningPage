@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculateur EVA®</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#e2e2e2;--accent:#5e5ce6;--good:#3aa675;--bad:#e8453d;}
+  @media (prefers-color-scheme:dark){:root{--bg:#1e1e2e;--fg:#e8e8e8;--muted:#9a9a9a;--line:#3a3a4a;--accent:#a5a3ff;--good:#57c99a;--bad:#f0726a;}}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:12px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px;margin-bottom:12px;}
+  .f label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;}
+  .f input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font-size:14px;}
+  #plot{width:100%;height:230px;margin-top:6px;}
+  .out{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
+  .card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:center;}
+  .card .k{font-size:11px;color:var(--muted);}
+  .card .v{font-size:18px;font-weight:700;margin-top:2px;}
+  .verdict{margin-top:10px;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600;text-align:center;}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="f"><label>EBIT (m)</label><input id="ebit" type="number" step="1" value="962"></div>
+    <div class="f"><label>Taux d'impôt (%)</label><input id="tax" type="number" step="0.1" value="32.3"></div>
+    <div class="f"><label>WACC (%)</label><input id="wacc" type="number" step="0.1" value="10.1"></div>
+    <div class="f"><label>Capital investi (m)</label><input id="ic" type="number" step="1" value="6761"></div>
+  </div>
+
+  <div id="plot"></div>
+
+  <div class="out">
+    <div class="card"><div class="k">NOPAT</div><div class="v" id="o_nopat">—</div></div>
+    <div class="card"><div class="k">ROCE</div><div class="v" id="o_roce">—</div></div>
+    <div class="card"><div class="k">Spread (ROCE−WACC)</div><div class="v" id="o_spread">—</div></div>
+  </div>
+  <div class="verdict" id="verdict"></div>
+  <div class="note" id="note"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ids=["ebit","tax","wacc","ic"];
+
+function compute(){
+  const ebit=+$("ebit").value, tax=+$("tax").value/100, wacc=+$("wacc").value/100, ic=+$("ic").value;
+  const nopat=ebit*(1-tax);
+  const charge=wacc*ic;
+  const eva=nopat-charge;
+  const roce= ic!==0 ? nopat/ic : 0;
+  const spread=roce-wacc;
+
+  $("o_nopat").textContent=nopat.toFixed(0)+" m";
+  $("o_roce").textContent=(roce*100).toFixed(2)+"%";
+  $("o_spread").textContent=(spread*100>=0?"+":"")+(spread*100).toFixed(2)+" pts";
+  $("o_spread").style.color = spread>=0 ? "var(--good)":"var(--bad)";
+
+  const v=$("verdict");
+  if(eva>=0){ v.style.background="rgba(58,166,117,.15)"; v.style.color="var(--good)";
+    v.textContent="EVA = +"+eva.toFixed(0)+" m → création de valeur (ROCE > WACC)"; }
+  else { v.style.background="rgba(232,69,61,.15)"; v.style.color="var(--bad)";
+    v.textContent="EVA = "+eva.toFixed(0)+" m → destruction de valeur (ROCE < WACC)"; }
+
+  const dark=window.matchMedia("(prefers-color-scheme:dark)").matches;
+  Plotly.react("plot",
+    [{type:"bar",x:["NOPAT","Charge en capital<br>(WACC × IC)"],y:[nopat,charge],
+      marker:{color:["#5e5ce6","#e8a33d"]},
+      hovertemplate:"%{x}: %{y:.0f} m<extra></extra>"}],
+    {margin:{l:46,r:10,t:8,b:34},paper_bgcolor:"rgba(0,0,0,0)",plot_bgcolor:"rgba(0,0,0,0)",
+     font:{color:dark?"#e8e8e8":"#1a1a1a",size:11},
+     yaxis:{title:"m",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false}},
+    {displayModeBar:false,responsive:true});
+
+  $("note").innerHTML="L'EVA est l'écart entre ce que l'actif rapporte après impôt (NOPAT) et ce qu'il coûte (WACC × capital investi). "+
+    "Tant que la barre NOPAT dépasse la charge en capital, l'entreprise crée de la valeur.";
+}
+ids.forEach(id=>$(id).addEventListener("input",compute));
+compute();
+</script>
+</body>
+</html>

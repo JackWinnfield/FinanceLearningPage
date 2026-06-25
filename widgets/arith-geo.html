@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moyenne arithmétique vs géométrique</title>
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#e2e2e2;--accent:#5e5ce6;--bad:#e8453d;}
+  @media (prefers-color-scheme:dark){:root{--bg:#1e1e2e;--fg:#e8e8e8;--muted:#9a9a9a;--line:#3a3a4a;--accent:#a5a3ff;--bad:#f0726a;}}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:14px;}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
+  input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font-size:15px;}
+  .out{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;}
+  .card{border:1px solid var(--line);border-radius:8px;padding:12px;text-align:center;}
+  .card .k{font-size:11px;color:var(--muted);} .card .v{font-size:22px;font-weight:700;margin-top:3px;}
+  .card .v.accent{color:var(--accent);} .card .v.bad{color:var(--bad);}
+  .note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.5;}
+</style>
+</head>
+<body>
+  <label>Rendements annuels (%, séparés par des virgules)</label>
+  <input id="r" value="10, 5.66">
+  <div class="out">
+    <div class="card"><div class="k">Moyenne arithmétique</div><div class="v" id="a">—</div></div>
+    <div class="card"><div class="k">Moyenne géométrique</div><div class="v accent" id="g">—</div></div>
+    <div class="card"><div class="k">Frein de volatilité</div><div class="v bad" id="d">—</div></div>
+  </div>
+  <div class="note" id="note"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function compute(){
+  const rs=$("r").value.split(",").map(x=>parseFloat(x.trim())/100).filter(x=>!isNaN(x));
+  if(!rs.length){return;}
+  const a=rs.reduce((s,x)=>s+x,0)/rs.length;
+  const prod=rs.reduce((p,x)=>p*(1+x),1);
+  const g=Math.pow(prod,1/rs.length)-1;
+  $("a").textContent=(a*100).toFixed(2)+"%";
+  $("g").textContent=(g*100).toFixed(2)+"%";
+  $("d").textContent=((a-g)*100).toFixed(2)+" pts";
+  const final=prod.toFixed(4);
+  $("note").innerHTML=`1 € devient <b>${final} €</b> après ${rs.length} an(s). La moyenne <b>géométrique</b> est celle qui reconstitue ce résultat composé — c'est le vrai rendement annualisé (TWRR). `+
+    `La moyenne arithmétique la <b>surestime toujours</b> dès qu'il y a de la volatilité : l'écart est le frein de volatilité. Essaie <code>50, -50</code> pour un cas extrême.`;
+}
+$("r").addEventListener("input",compute);
+compute();
+</script>
+</body>
+</html>

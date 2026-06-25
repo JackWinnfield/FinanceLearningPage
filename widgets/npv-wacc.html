@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NPV & WACC</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#e2e2e2;--accent:#5e5ce6;--good:#3aa675;--bad:#e8453d;}
+  @media (prefers-color-scheme:dark){:root{--bg:#1e1e2e;--fg:#e8e8e8;--muted:#9a9a9a;--line:#3a3a4a;--accent:#a5a3ff;--good:#57c99a;--bad:#f0726a;}}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:12px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px;margin-bottom:10px;}
+  .f label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;}
+  .f input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font-size:14px;}
+  .full{grid-column:1/-1;}
+  #plot{width:100%;height:280px;}
+  .out{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
+  .card{border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center;}
+  .card .k{font-size:11px;color:var(--muted);} .card .v{font-size:18px;font-weight:700;margin-top:2px;}
+  .card .v.accent{color:var(--accent);}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="f full"><label>Cash flows du projet (milliers, Cf₀ inclus)</label><input id="cf" value="-34000, 11850, 11850, 7950, 7950, 11950"></div>
+    <div class="f"><label>Taux sans risque R<sub>f</sub> (%)</label><input id="rf" type="number" step="0.5" value="5"></div>
+    <div class="f"><label>Prime de marché (%)</label><input id="mrp" type="number" step="0.5" value="8"></div>
+    <div class="f"><label>Beta des fonds propres</label><input id="beta" type="number" step="0.05" value="1.1"></div>
+    <div class="f"><label>Poids fonds propres E/V (%)</label><input id="we" type="number" step="5" value="80"></div>
+    <div class="f"><label>Coût de la dette R<sub>D</sub> (%)</label><input id="rd" type="number" step="0.5" value="5"></div>
+  </div>
+
+  <div id="plot"></div>
+
+  <div class="out">
+    <div class="card"><div class="k">Coût des fonds propres R<sub>E</sub></div><div class="v" id="o_re">—</div></div>
+    <div class="card"><div class="k">WACC</div><div class="v accent" id="o_wacc">—</div></div>
+    <div class="card"><div class="k">NPV au WACC</div><div class="v" id="o_npv">—</div></div>
+  </div>
+  <div class="note" id="note"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ids=["cf","rf","mrp","beta","we","rd"];
+function npv(cf,r){ return cf.reduce((s,c,t)=>s+c/Math.pow(1+r,t),0); }
+
+function compute(){
+  const cf=$("cf").value.split(",").map(x=>parseFloat(x.trim())).filter(x=>!isNaN(x));
+  const rf=+$("rf").value/100, mrp=+$("mrp").value/100, beta=+$("beta").value;
+  const we=+$("we").value/100, rd=+$("rd").value/100;
+  const Re=rf+beta*mrp;
+  const WACC=we*Re+(1-we)*rd;
+
+  $("o_re").textContent=(Re*100).toFixed(2)+"%";
+  $("o_wacc").textContent=(WACC*100).toFixed(2)+"%";
+  const npvWacc=npv(cf,WACC)/1000;
+  $("o_npv").textContent=npvWacc.toFixed(2)+" m";
+  $("o_npv").style.color = npvWacc>=0 ? "var(--good)":"var(--bad)";
+
+  // profil de NPV
+  const xs=[],ys=[];
+  for(let r=0;r<=0.25001;r+=0.005){ xs.push(r*100); ys.push(npv(cf,r)/1000); }
+  const dark=window.matchMedia("(prefers-color-scheme:dark)").matches;
+  Plotly.react("plot",
+    [{x:xs,y:ys,mode:"lines",line:{color:"#5e5ce6",width:3},name:"NPV(r)",
+      hovertemplate:"r=%{x:.1f}%<br>NPV=%{y:.2f} m<extra></extra>"},
+     {x:[WACC*100],y:[npvWacc],mode:"markers",marker:{size:12,color:"#e8453d",symbol:"circle"},
+      name:"WACC",hovertemplate:"WACC=%{x:.2f}%<br>NPV=%{y:.2f} m<extra></extra>"}],
+    {margin:{l:48,r:10,t:8,b:34},paper_bgcolor:"rgba(0,0,0,0)",plot_bgcolor:"rgba(0,0,0,0)",
+     font:{color:dark?"#e8e8e8":"#1a1a1a",size:11},showlegend:false,
+     xaxis:{title:"Taux d'actualisation r (%)",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false},
+     yaxis:{title:"NPV (m USD)",gridcolor:dark?"#3a3a4a":"#eee",zeroline:true,zerolinecolor:dark?"#666":"#aaa"}},
+    {displayModeBar:false,responsive:true});
+
+  $("note").innerHTML=`Le point rouge est le projet actualisé au WACC. La courbe décroît : <b>plus le taux monte, plus la NPV baisse</b>. `+
+    `Là où la courbe croise zéro se trouve le <b>TRI</b> (taux de rendement interne). Tant que WACC &lt; TRI, la NPV est positive et le projet crée de la valeur.`;
+}
+ids.forEach(id=>$(id).addEventListener("input",compute));
+compute();
+</script>
+</body>
+</html>

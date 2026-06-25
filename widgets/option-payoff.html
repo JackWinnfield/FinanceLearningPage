@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payoff d'options</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#e2e2e2;--accent:#5e5ce6;--good:#3aa675;--bad:#e8453d;}
+  @media (prefers-color-scheme:dark){:root{--bg:#1e1e2e;--fg:#e8e8e8;--muted:#9a9a9a;--line:#3a3a4a;--accent:#a5a3ff;--good:#57c99a;--bad:#f0726a;}}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:12px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px 16px;margin-bottom:10px;}
+  .f label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;}
+  .f input,.f select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font-size:14px;}
+  .f select option{color:#000;}
+  #plot{width:100%;height:320px;}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="f"><label>Stratégie</label>
+      <select id="strat">
+        <option value="call">Achat de call</option>
+        <option value="put">Achat de put</option>
+        <option value="bull">Bull spread (call K₁ / −call K₂)</option>
+        <option value="straddle">Straddle (call + put, même K)</option>
+        <option value="protput">Protective put (action + put)</option>
+      </select></div>
+    <div class="f"><label>Strike K₁</label><input id="k1" type="number" step="1" value="100"></div>
+    <div class="f" id="k2wrap"><label>Strike K₂</label><input id="k2" type="number" step="1" value="120"></div>
+    <div class="f"><label>Prime / coût net total</label><input id="prem" type="number" step="0.5" value="6"></div>
+  </div>
+  <div id="plot"></div>
+  <div class="note" id="note"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ids=["strat","k1","k2","prem"];
+function payoff(strat,ST,k1,k2,S0){
+  const call=(s,k)=>Math.max(s-k,0), put=(s,k)=>Math.max(k-s,0);
+  switch(strat){
+    case "call": return call(ST,k1);
+    case "put": return put(ST,k1);
+    case "bull": return call(ST,k1)-call(ST,k2);
+    case "straddle": return call(ST,k1)+put(ST,k1);
+    case "protput": return (ST-S0)+put(ST,k1);
+  }
+}
+function compute(){
+  const strat=$("strat").value, k1=+$("k1").value, k2=+$("k2").value, prem=+$("prem").value;
+  $("k2wrap").style.display = strat==="bull" ? "block":"none";
+  const S0=k1; // pour protective put, action achetée ~ au strike
+  const lo=0, hi=Math.max(k1,k2)*2;
+  const xs=[],pay=[],prof=[];
+  for(let ST=lo;ST<=hi;ST+=hi/120){ const pf=payoff(strat,ST,k1,k2,S0); xs.push(ST); pay.push(pf); prof.push(pf-prem); }
+  const dark=window.matchMedia("(prefers-color-scheme:dark)").matches;
+  Plotly.react("plot",
+    [{x:xs,y:pay,mode:"lines",name:"Payoff (brut)",line:{color:"#9a98e8",width:2,dash:"dot"},hovertemplate:"S_T=%{x:.0f}<br>payoff %{y:.1f}<extra></extra>"},
+     {x:xs,y:prof,mode:"lines",name:"Profit (net de prime)",line:{color:"#5e5ce6",width:3},hovertemplate:"S_T=%{x:.0f}<br>profit %{y:.1f}<extra></extra>"},
+     {x:[lo,hi],y:[0,0],mode:"lines",line:{color:dark?"#666":"#bbb",width:1},hoverinfo:"skip"}],
+    {margin:{l:46,r:10,t:8,b:34},paper_bgcolor:"rgba(0,0,0,0)",plot_bgcolor:"rgba(0,0,0,0)",
+     font:{color:dark?"#e8e8e8":"#1a1a1a",size:11},
+     legend:{orientation:"h",y:-0.2,font:{size:11}},
+     xaxis:{title:"Prix du sous-jacent à l'échéance S_T",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false},
+     yaxis:{title:"Gain / perte",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false}},
+    {displayModeBar:false,responsive:true});
+
+  const notes={
+    call:"Achat de call : perte limitée à la prime, gain illimité à la hausse. Asymétrie caractéristique de l'option.",
+    put:"Achat de put : perte limitée à la prime, gain à la baisse (plafonné car S_T ≥ 0).",
+    bull:"Bull spread : profit borné à la hausse comme à la baisse — on parie sur une hausse modérée à moindre coût.",
+    straddle:"Straddle : profite d'un mouvement ample dans les <b>deux</b> sens (pari sur la volatilité), perd si le prix reste près de K.",
+    protput:"Protective put : la baisse est plancher-née par le put, la hausse reste ouverte — une assurance sur l'action."
+  };
+  $("note").innerHTML="La ligne pointillée est le payoff brut (jamais négatif pour une option longue) ; la ligne pleine retranche la prime. "+notes[strat];
+}
+ids.forEach(id=>$(id).addEventListener("input",compute));
+$("strat").addEventListener("change",compute);
+compute();
+</script>
+</body>
+</html>

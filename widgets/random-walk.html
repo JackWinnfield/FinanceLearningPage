@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marche aléatoire & EMH</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#e2e2e2;--accent:#5e5ce6;}
+  @media (prefers-color-scheme:dark){:root{--bg:#1e1e2e;--fg:#e8e8e8;--muted:#9a9a9a;--line:#3a3a4a;--accent:#a5a3ff;}}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:12px;}
+  .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+  button{padding:7px 14px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;}
+  .f{font-size:12px;color:var(--muted);}
+  .row{display:flex;gap:12px;flex-wrap:wrap;}
+  .half{flex:1 1 280px;}
+  #path,#scatter{width:100%;height:230px;}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .corr{font-weight:700;color:var(--accent);}
+</style>
+</head>
+<body>
+  <div class="bar">
+    <button id="regen">↻ Régénérer une marche aléatoire</button>
+    <span class="f">Pile +3% / Face −2,5%, 120 périodes</span>
+  </div>
+  <div class="row">
+    <div class="half"><div class="f">Trajectoire du « prix »</div><div id="path"></div></div>
+    <div class="half"><div class="f">Rendement R<sub>t</sub> vs R<sub>t-1</sub></div><div id="scatter"></div></div>
+  </div>
+  <div class="note" id="note"></div>
+
+<script>
+function corr(x,y){
+  const n=x.length, mx=x.reduce((a,b)=>a+b,0)/n, my=y.reduce((a,b)=>a+b,0)/n;
+  let sxy=0,sx=0,sy=0;
+  for(let i=0;i<n;i++){const dx=x[i]-mx,dy=y[i]-my;sxy+=dx*dy;sx+=dx*dx;sy+=dy*dy;}
+  return sxy/Math.sqrt(sx*sy);
+}
+function draw(){
+  const N=120, up=0.03, dn=-0.025;
+  let price=[100], rets=[];
+  for(let i=0;i<N;i++){
+    const r = Math.random()<0.5 ? up : dn;
+    rets.push(r*100);
+    price.push(price[price.length-1]*(1+r));
+  }
+  const lag0=rets.slice(0,-1), lag1=rets.slice(1);
+  const c=corr(lag0,lag1);
+  const dark=window.matchMedia("(prefers-color-scheme:dark)").matches;
+  const base={paper_bgcolor:"rgba(0,0,0,0)",plot_bgcolor:"rgba(0,0,0,0)",font:{color:dark?"#e8e8e8":"#1a1a1a",size:11}};
+
+  Plotly.react("path",
+    [{y:price,mode:"lines",line:{color:"#5e5ce6",width:2},hovertemplate:"t=%{x}<br>%{y:.1f}<extra></extra>"}],
+    {...base,margin:{l:40,r:8,t:6,b:24},xaxis:{title:"période",gridcolor:dark?"#3a3a4a":"#eee"},yaxis:{gridcolor:dark?"#3a3a4a":"#eee"}},
+    {displayModeBar:false,responsive:true});
+
+  Plotly.react("scatter",
+    [{x:lag0,y:lag1,mode:"markers",marker:{size:5,color:"#5e5ce6",opacity:0.6},
+      hovertemplate:"R(t-1)=%{x:.2f}%<br>R(t)=%{y:.2f}%<extra></extra>"}],
+    {...base,margin:{l:42,r:8,t:6,b:32},
+     xaxis:{title:"R(t-1) %",gridcolor:dark?"#3a3a4a":"#eee",zeroline:true,zerolinecolor:dark?"#555":"#bbb"},
+     yaxis:{title:"R(t) %",gridcolor:dark?"#3a3a4a":"#eee",zeroline:true,zerolinecolor:dark?"#555":"#bbb"}},
+    {displayModeBar:false,responsive:true});
+
+  document.getElementById("note").innerHTML=
+    `Corrélation entre rendements successifs : <span class="corr">${c.toFixed(3)}</span> — proche de zéro. `+
+    `La trajectoire <b>semble</b> dessiner tendances et figures, mais elle est purement aléatoire : connaître R<sub>t-1</sub> n'aide pas à prédire R<sub>t</sub>. `+
+    `C'est l'intuition de la marche aléatoire et de l'efficience faible — régénère plusieurs fois pour le constater.`;
+}
+document.getElementById("regen").addEventListener("click",draw);
+draw();
+</script>
+</body>
+</html>

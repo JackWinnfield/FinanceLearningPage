@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Positions : long / short / levier</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#e2e2e2;--good:#3aa675;--bad:#e8453d;--accent:#5e5ce6;}
+  @media (prefers-color-scheme:dark){:root{--bg:#1e1e2e;--fg:#e8e8e8;--muted:#9a9a9a;--line:#3a3a4a;--good:#57c99a;--bad:#f0726a;--accent:#a5a3ff;}}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:12px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px 18px;margin-bottom:12px;}
+  .f label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .f .val{color:var(--accent);font-weight:600;}
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  #plot{width:100%;height:260px;}
+  .note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;}
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="f"><label>Variation du prix : <span class="val" id="l_move">+10%</span></label><input type="range" id="move" min="-30" max="30" step="1" value="10"></div>
+    <div class="f"><label>Levier (×) : <span class="val" id="l_lev">2.5</span></label><input type="range" id="lev" min="1" max="5" step="0.5" value="2.5"></div>
+    <div class="f"><label>Coût de financement marge : <span class="val" id="l_fin">3%</span></label><input type="range" id="fin" min="0" max="10" step="0.5" value="3"></div>
+  </div>
+  <div id="plot"></div>
+  <div class="note" id="note"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ids=["move","lev","fin"];
+function compute(){
+  const m=+$("move").value/100, L=+$("lev").value, fin=+$("fin").value/100;
+  $("l_move").textContent=(m*100>=0?"+":"")+(m*100).toFixed(0)+"%";
+  $("l_lev").textContent=L.toFixed(1);
+  $("l_fin").textContent=(fin*100).toFixed(1)+"%";
+
+  const longR=m;                         // détenir l'actif
+  const shortR=-m;                       // vendre à découvert
+  const levR=L*m-(L-1)*fin;              // sur fonds propres, net du coût de la marge
+
+  const vals=[longR,shortR,levR].map(x=>x*100);
+  const cats=["Longue","Courte","Levier ("+L.toFixed(1)+"×)"];
+  const colors=vals.map(v=>v>=0?"#3aa675":"#e8453d");
+  const dark=window.matchMedia("(prefers-color-scheme:dark)").matches;
+  Plotly.react("plot",
+    [{type:"bar",x:cats,y:vals,marker:{color:colors},
+      text:vals.map(v=>(v>=0?"+":"")+v.toFixed(1)+"%"),textposition:"outside",
+      hovertemplate:"%{x}: %{y:.1f}%<extra></extra>"}],
+    {margin:{l:46,r:10,t:18,b:30},paper_bgcolor:"rgba(0,0,0,0)",plot_bgcolor:"rgba(0,0,0,0)",
+     font:{color:dark?"#e8e8e8":"#1a1a1a",size:12},
+     yaxis:{title:"Rendement (%)",gridcolor:dark?"#3a3a4a":"#eee",zeroline:true,zerolinecolor:dark?"#555":"#bbb"}},
+    {displayModeBar:false,responsive:true});
+
+  $("note").innerHTML=`Position longue : rendement = variation du prix. Position courte : rendement = <b>opposé</b> de la variation (gagne quand le prix baisse). `+
+    `Levier : <b>${L.toFixed(1)} × variation</b> sur les fonds propres, moins le coût de la marge. `+
+    `Rappels de risque : perte maximale d'une position longue = <b>100%</b> ; perte d'une position courte = <b>illimitée</b>.`;
+}
+ids.forEach(id=>$(id).addEventListener("input",compute));
+compute();
+</script>
+</body>
+</html>

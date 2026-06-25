@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DCF multi-étapes (FCFF)</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e2e2e2; --accent:#5e5ce6; --good:#3aa675; }
+  @media (prefers-color-scheme: dark){ :root{ --bg:#1e1e2e; --fg:#e8e8e8; --muted:#9a9a9a; --line:#3a3a4a; --accent:#a5a3ff; --good:#57c99a; } }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:12px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px 16px;margin-bottom:12px;}
+  .f label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;}
+  .f input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font-size:14px;}
+  .full{grid-column:1/-1;}
+  #plot{width:100%;height:260px;margin-top:6px;}
+  .out{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px;}
+  .card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
+  .card .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .card .v{font-size:20px;font-weight:700;margin-top:2px;}
+  .card .v.accent{color:var(--accent);} .card .v.good{color:var(--good);}
+  .note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;}
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="f full"><label>FCFF explicites (m, séparés par des virgules)</label><input id="fcff" value="10, 12, 14"></div>
+    <div class="f"><label>Taux sans risque R<sub>f</sub> (%)</label><input id="rf" type="number" step="0.1" value="2"></div>
+    <div class="f"><label>Beta des fonds propres</label><input id="beta" type="number" step="0.05" value="1.5"></div>
+    <div class="f"><label>Prime de risque marché (%)</label><input id="mrp" type="number" step="0.1" value="6"></div>
+    <div class="f"><label>Coût dette avant impôt (%)</label><input id="rd" type="number" step="0.1" value="5"></div>
+    <div class="f"><label>Taux d'impôt (%)</label><input id="tax" type="number" step="1" value="35"></div>
+    <div class="f"><label>Levier cible D/V (%)</label><input id="dv" type="number" step="1" value="30"></div>
+    <div class="f"><label>Croissance terminale g (%)</label><input id="g" type="number" step="0.1" value="3"></div>
+    <div class="f"><label>Dette nette (m)</label><input id="nd" type="number" step="1" value="40"></div>
+  </div>
+
+  <div id="plot"></div>
+
+  <div class="out">
+    <div class="card"><div class="k">WACC</div><div class="v accent" id="o_wacc">—</div></div>
+    <div class="card"><div class="k">Valeur terminale (t=n)</div><div class="v" id="o_tv">—</div></div>
+    <div class="card"><div class="k">Enterprise Value</div><div class="v" id="o_ev">—</div></div>
+    <div class="card"><div class="k">Capitaux propres</div><div class="v good" id="o_eq">—</div></div>
+  </div>
+  <div class="note" id="note"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ids=["fcff","rf","beta","mrp","rd","tax","dv","g","nd"];
+
+function compute(){
+  const fcff=$("fcff").value.split(",").map(x=>parseFloat(x.trim())).filter(x=>!isNaN(x));
+  const rf=+$("rf").value/100, beta=+$("beta").value, mrp=+$("mrp").value/100;
+  const rd=+$("rd").value/100, tax=+$("tax").value/100, dv=+$("dv").value/100;
+  const g=+$("g").value/100, nd=+$("nd").value;
+
+  const Re=rf+beta*mrp;
+  const RdAfter=rd*(1-tax);
+  const WACC=(1-dv)*Re+dv*RdAfter;
+
+  const n=fcff.length;
+  let pvExplicit=[], labels=[];
+  fcff.forEach((f,i)=>{ pvExplicit.push(f/Math.pow(1+WACC,i+1)); labels.push("FCFF "+(i+1)); });
+  const FCFFnext=fcff[n-1]*(1+g);
+  const TV=(WACC>g)? FCFFnext/(WACC-g) : NaN;
+  const pvTV=TV/Math.pow(1+WACC,n);
+  const EV=pvExplicit.reduce((a,b)=>a+b,0)+pvTV;
+  const equity=EV-nd;
+
+  $("o_wacc").textContent=(WACC*100).toFixed(2)+"%";
+  $("o_tv").textContent=isNaN(TV)?"n/d (g ≥ WACC)":TV.toFixed(1)+" m";
+  $("o_ev").textContent=EV.toFixed(1)+" m";
+  $("o_eq").textContent=equity.toFixed(1)+" m";
+
+  const xs=[...labels,"PV(VT)"], ys=[...pvExplicit, pvTV];
+  const colors=xs.map((l,i)=> i===xs.length-1 ? "#e8a33d" : "#5e5ce6");
+  const dark=window.matchMedia("(prefers-color-scheme: dark)").matches;
+  Plotly.react("plot",
+    [{x:xs,y:ys,type:"bar",marker:{color:colors},hovertemplate:"%{x}<br>%{y:.2f} m<extra></extra>"}],
+    {margin:{l:44,r:10,t:8,b:30},paper_bgcolor:"rgba(0,0,0,0)",plot_bgcolor:"rgba(0,0,0,0)",
+     font:{color:dark?"#e8e8e8":"#1a1a1a",size:11},
+     yaxis:{title:"Valeur actuelle (m)",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false},
+     xaxis:{gridcolor:"rgba(0,0,0,0)"}},
+    {displayModeBar:false,responsive:true});
+
+  const share=EV>0?(pvTV/EV*100):0;
+  $("note").innerHTML=`Coût des fonds propres R<sub>e</sub> = <b>${(Re*100).toFixed(2)}%</b> · coût de la dette après impôt = <b>${(RdAfter*100).toFixed(2)}%</b>. `+
+    `La valeur terminale pèse <b>${share.toFixed(0)}%</b> de l'Enterprise Value — d'où l'importance des hypothèses de long terme (g, WACC).`;
+}
+ids.forEach(id=>$(id).addEventListener("input",compute));
+compute();
+</script>
+</body>
+</html>

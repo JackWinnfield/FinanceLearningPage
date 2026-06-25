@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frontière efficiente — deux actifs</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #666; --line: #e0e0e0;
+    --accent: #5e5ce6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1e1e2e; --fg: #e8e8e8; --muted: #9a9a9a; --line: #3a3a4a; --accent: #a5a3ff; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--fg); background: var(--bg); padding: 12px;
+  }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 18px; margin-bottom: 14px; }
+  .ctrl label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .ctrl .val { color: var(--accent); font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  #plot { width: 100%; height: 380px; }
+  .readout { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+  .readout b { color: var(--fg); }
+</style>
+</head>
+<body>
+  <div class="controls">
+    <div class="ctrl"><label>Rendement actif A : <span class="val" id="l_mu1">12%</span></label><input type="range" id="mu1" min="0" max="25" step="0.5" value="12"></div>
+    <div class="ctrl"><label>Volatilité actif A : <span class="val" id="l_s1">20%</span></label><input type="range" id="s1" min="1" max="40" step="0.5" value="20"></div>
+    <div class="ctrl"><label>Rendement actif B : <span class="val" id="l_mu2">6%</span></label><input type="range" id="mu2" min="0" max="25" step="0.5" value="6"></div>
+    <div class="ctrl"><label>Volatilité actif B : <span class="val" id="l_s2">10%</span></label><input type="range" id="s2" min="1" max="40" step="0.5" value="10"></div>
+    <div class="ctrl"><label>Corrélation ρ : <span class="val" id="l_rho">-0.20</span></label><input type="range" id="rho" min="-100" max="100" step="5" value="-20"></div>
+    <div class="ctrl"><label>Taux sans risque : <span class="val" id="l_rf">2%</span></label><input type="range" id="rf" min="0" max="10" step="0.25" value="2"></div>
+  </div>
+  <div id="plot"></div>
+  <div class="readout" id="readout"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const ids = ["mu1","s1","mu2","s2","rho","rf"];
+
+function compute() {
+  const mu1 = +$("mu1").value/100, s1 = +$("s1").value/100;
+  const mu2 = +$("mu2").value/100, s2 = +$("s2").value/100;
+  const rho = +$("rho").value/100, rf = +$("rf").value/100;
+
+  // Étiquettes
+  $("l_mu1").textContent = (mu1*100).toFixed(1)+"%";
+  $("l_s1").textContent  = (s1*100).toFixed(1)+"%";
+  $("l_mu2").textContent = (mu2*100).toFixed(1)+"%";
+  $("l_s2").textContent  = (s2*100).toFixed(1)+"%";
+  $("l_rho").textContent = rho.toFixed(2);
+  $("l_rf").textContent  = (rf*100).toFixed(1)+"%";
+
+  const pt = w => {
+    const mu = w*mu1 + (1-w)*mu2;
+    const v  = w*w*s1*s1 + (1-w)*(1-w)*s2*s2 + 2*w*(1-w)*rho*s1*s2;
+    return { mu, sig: Math.sqrt(Math.max(v,0)) };
+  };
+
+  // Frontière (autorise des ventes à découvert modérées)
+  const fx=[], fy=[];
+  let tang=null, gmv=null;
+  for (let w=-0.5; w<=1.5+1e-9; w+=0.005) {
+    const p = pt(w);
+    fx.push(p.sig*100); fy.push(p.mu*100);
+    const sharpe = p.sig>1e-9 ? (p.mu-rf)/p.sig : -Infinity;
+    if (!tang || sharpe>tang.sharpe) tang = {...p, w, sharpe};
+    if (!gmv  || p.sig<gmv.sig)      gmv  = {...p, w};
+  }
+
+  // Capital Market Line : de (0, rf) au-delà du point de tangence
+  const cmlEnd = Math.max(s1, s2, tang.sig)*1.25*100;
+  const cmlX = [0, cmlEnd];
+  const cmlY = [rf*100, rf*100 + tang.sharpe*cmlEnd];
+
+  const data = [
+    { x: fx, y: fy, mode:"lines", name:"Frontière", line:{color:"#5e5ce6", width:3}, hovertemplate:"σ %{x:.2f}%<br>μ %{y:.2f}%<extra></extra>" },
+    { x: cmlX, y: cmlY, mode:"lines", name:"CML", line:{color:"#e8a33d", width:2, dash:"dash"}, hoverinfo:"skip" },
+    { x:[s1*100, s2*100], y:[mu1*100, mu2*100], mode:"markers+text", name:"Actifs", text:["A","B"], textposition:"top center", marker:{size:10, color:"#888"}, hoverinfo:"text" },
+    { x:[gmv.sig*100], y:[gmv.mu*100], mode:"markers", name:"GMV", marker:{size:11, color:"#3aa675", symbol:"diamond"}, hovertemplate:"GMV<br>σ %{x:.2f}%<br>μ %{y:.2f}%<extra></extra>" },
+    { x:[tang.sig*100], y:[tang.mu*100], mode:"markers", name:"Tangence (Sharpe max)", marker:{size:13, color:"#e8453d", symbol:"star"}, hovertemplate:"Tangence<br>σ %{x:.2f}%<br>μ %{y:.2f}%<extra></extra>" }
+  ];
+
+  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const layout = {
+    margin:{l:48, r:12, t:10, b:42},
+    paper_bgcolor:"rgba(0,0,0,0)", plot_bgcolor:"rgba(0,0,0,0)",
+    font:{ color: dark ? "#e8e8e8" : "#1a1a1a", size:12 },
+    xaxis:{ title:"Risque σ (%)", gridcolor: dark?"#3a3a4a":"#eee", zeroline:false },
+    yaxis:{ title:"Rendement μ (%)", gridcolor: dark?"#3a3a4a":"#eee", zeroline:false },
+    legend:{ orientation:"h", y:-0.22, font:{size:11} },
+    showlegend:true
+  };
+  Plotly.react("plot", data, layout, {displayModeBar:false, responsive:true});
+
+  $("readout").innerHTML =
+    `Portefeuille de <b>Sharpe maximal</b> (tangence) : poids actif A = <b>${(tang.w*100).toFixed(0)}%</b>, ` +
+    `μ = <b>${(tang.mu*100).toFixed(2)}%</b>, σ = <b>${(tang.sig*100).toFixed(2)}%</b>, ` +
+    `ratio de Sharpe = <b>${tang.sharpe.toFixed(3)}</b>. ` +
+    `La diversification est d'autant plus forte que ρ est faible : à ρ = −1, le risque peut être théoriquement annulé.`;
+}
+
+ids.forEach(id => $(id).addEventListener("input", compute));
+compute();
+</script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MM : coût du capital & levier</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#e2e2e2;--accent:#5e5ce6;}
+  @media (prefers-color-scheme:dark){:root{--bg:#1e1e2e;--fg:#e8e8e8;--muted:#9a9a9a;--line:#3a3a4a;--accent:#a5a3ff;}}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:12px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px 16px;margin-bottom:10px;align-items:end;}
+  .f label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;}
+  .f input[type=number]{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font-size:14px;}
+  .tax{display:flex;align-items:center;gap:8px;font-size:14px;}
+  .tax input{width:18px;height:18px;accent-color:var(--accent);}
+  #plot{width:100%;height:320px;}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="f"><label>Taux sans risque R<sub>f</sub> (%)</label><input id="rf" type="number" step="0.5" value="7"></div>
+    <div class="f"><label>Prime de marché (%)</label><input id="mrp" type="number" step="0.5" value="6"></div>
+    <div class="f"><label>Beta de l'actif β<sub>A</sub></label><input id="ba" type="number" step="0.05" value="0.8"></div>
+    <div class="f"><label>Coût de la dette R<sub>D</sub> (%)</label><input id="rd" type="number" step="0.5" value="7"></div>
+    <div class="f"><label>Taux d'impôt τc (%)</label><input id="tax" type="number" step="1" value="35"></div>
+    <div class="f"><label class="tax"><input type="checkbox" id="taxon"> Activer l'impôt</label></div>
+  </div>
+  <div id="plot"></div>
+  <div class="note" id="note"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ids=["rf","mrp","ba","rd","tax","taxon"];
+function compute(){
+  const rf=+$("rf").value/100, mrp=+$("mrp").value/100, ba=+$("ba").value, rD=+$("rd").value/100;
+  const tax=$("taxon").checked, tau=+$("tax").value/100;
+  const rA=rf+ba*mrp;
+  const t = tax ? (1-tau) : 1;
+  const xs=[], reArr=[], waccArr=[], rdArr=[];
+  for(let dv=0; dv<=0.901; dv+=0.02){
+    const de = dv<1 ? dv/(1-dv) : 99;
+    const rE = rA + de*(rA-rD)*t;
+    const wacc = (1-dv)*rE + dv*rD*t;
+    xs.push(dv*100); reArr.push(rE*100); waccArr.push(wacc*100); rdArr.push(rD*t*100);
+  }
+  const dark=window.matchMedia("(prefers-color-scheme:dark)").matches;
+  const line=(name,y,color,dash)=>({x:xs,y,mode:"lines",name,line:{color,width:3,dash:dash||"solid"},
+    hovertemplate:name+" — D/V %{x:.0f}%: %{y:.2f}%<extra></extra>"});
+  Plotly.react("plot",
+    [line("Coût des fonds propres r_E",reArr,"#5e5ce6"),
+     line("WACC",waccArr,"#e8453d"),
+     line(tax?"r_D après impôt":"Coût de la dette r_D",rdArr,"#3aa675","dot")],
+    {margin:{l:46,r:10,t:8,b:38},paper_bgcolor:"rgba(0,0,0,0)",plot_bgcolor:"rgba(0,0,0,0)",
+     font:{color:dark?"#e8e8e8":"#1a1a1a",size:11},
+     legend:{orientation:"h",y:-0.2,font:{size:11}},
+     xaxis:{title:"Levier D/V (%)",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false},
+     yaxis:{title:"Taux (%)",gridcolor:dark?"#3a3a4a":"#eee",zeroline:false}},
+    {displayModeBar:false,responsive:true});
+
+  $("note").innerHTML = tax
+    ? `<b>Avec impôt :</b> grâce au bouclier fiscal (r_D devient r_D(1−τc)), le <b>WACC décroît</b> avec le levier — d'où la conclusion naïve « 100% dette ». Le coût des fonds propres r_E continue de monter, mais moins vite.`
+    : `<b>Sans impôt (MM) :</b> le <b>WACC est plat</b> — le financement ne change pas la valeur. Tout l'effet du levier passe dans r_E qui monte proportionnellement à D/E : c'est le sophisme de la dette bon marché illustré.`;
+}
+ids.forEach(id=>$(id).addEventListener("input",compute));
+$("taxon").addEventListener("change",compute);
+compute();
+</script>
+</body>
+</html>

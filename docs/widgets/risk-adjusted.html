@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesures ajustées au risque</title>
+<style>
+  :root{--bg:#fff;--fg:#1a1a1a;--muted:#666;--line:#e2e2e2;--accent:#5e5ce6;--good:#3aa675;--bad:#e8453d;}
+  @media (prefers-color-scheme:dark){:root{--bg:#1e1e2e;--fg:#e8e8e8;--muted:#9a9a9a;--line:#3a3a4a;--accent:#a5a3ff;--good:#57c99a;--bad:#f0726a;}}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);padding:14px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px 16px;margin-bottom:6px;}
+  .f label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;}
+  .f input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font-size:14px;}
+  .sec{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;}
+  .out{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px;}
+  .card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
+  .card .k{font-size:12px;color:var(--muted);} .card .v{font-size:20px;font-weight:700;margin-top:2px;}
+  .card .sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;}
+</style>
+</head>
+<body>
+  <div class="sec">Portefeuille</div>
+  <div class="grid">
+    <div class="f"><label>Rendement R<sub>P</sub> (%)</label><input id="rp" type="number" step="0.5" value="35"></div>
+    <div class="f"><label>Volatilité σ<sub>P</sub> (%)</label><input id="sp" type="number" step="0.5" value="42"></div>
+    <div class="f"><label>Beta β<sub>P</sub></label><input id="bp" type="number" step="0.05" value="1.2"></div>
+  </div>
+  <div class="sec">Marché & taux sans risque</div>
+  <div class="grid">
+    <div class="f"><label>Rendement marché R<sub>M</sub> (%)</label><input id="rm" type="number" step="0.5" value="28"></div>
+    <div class="f"><label>Volatilité marché σ<sub>M</sub> (%)</label><input id="sm" type="number" step="0.5" value="30"></div>
+    <div class="f"><label>Taux sans risque r<sub>f</sub> (%)</label><input id="rf" type="number" step="0.25" value="6"></div>
+  </div>
+
+  <div class="out">
+    <div class="card"><div class="k">Ratio de Sharpe</div><div class="v" id="o_sr">—</div><div class="sub">risque total</div></div>
+    <div class="card"><div class="k">Ratio de Treynor</div><div class="v" id="o_tr">—</div><div class="sub">risque systématique</div></div>
+    <div class="card"><div class="k">Alpha de Jensen</div><div class="v" id="o_al">—</div><div class="sub">vs CAPM</div></div>
+    <div class="card"><div class="k">M² (vs marché)</div><div class="v" id="o_m2">—</div><div class="sub">points de rendement</div></div>
+  </div>
+  <div class="note" id="note"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ids=["rp","sp","bp","rm","sm","rf"];
+function compute(){
+  const rp=+$("rp").value, sp=+$("sp").value, bp=+$("bp").value;
+  const rm=+$("rm").value, sm=+$("sm").value, rf=+$("rf").value;
+  const SR=(rp-rf)/sp;
+  const SRm=(rm-rf)/sm;
+  const TR=(rp-rf)/bp;
+  const capm=rf+bp*(rm-rf);
+  const alpha=rp-capm;
+  const M2=(SR-SRm)*sm;
+
+  $("o_sr").textContent=SR.toFixed(2);
+  $("o_tr").textContent=TR.toFixed(1)+"%";
+  $("o_al").innerHTML=(alpha>=0?"+":"")+alpha.toFixed(1)+"%";
+  $("o_al").style.color = alpha>=0?"var(--good)":"var(--bad)";
+  $("o_m2").innerHTML=(M2>=0?"+":"")+M2.toFixed(2)+"%";
+  $("o_m2").style.color = M2>=0?"var(--good)":"var(--bad)";
+
+  $("note").innerHTML=`CAPM attendu pour ce β : <b>${capm.toFixed(1)}%</b>. `+
+    `Sharpe du marché = ${SRm.toFixed(2)}. `+
+    `Sharpe et M² jugent le risque <b>total</b> (placement isolé) ; Treynor et alpha jugent le risque <b>systématique</b> (brique d'un portefeuille diversifié). `+
+    `Un portefeuille peut afficher un alpha positif (au-dessus de la SML) tout en ayant un Sharpe inférieur au marché.`;
+}
+ids.forEach(id=>$(id).addEventListener("input",compute));
+compute();
+</script>
+</body>
+</html>

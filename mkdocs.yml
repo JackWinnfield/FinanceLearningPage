@@ -1,0 +1,88 @@
+site_name: Révisions Finance
+site_description: Base de connaissances finance — Master IBF, TBS
+site_author: Theo
+
+theme:
+  name: material
+  language: fr
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Passer en mode sombre
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Passer en mode clair
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - toc.follow
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+plugins:
+  - search:
+      lang: fr
+
+nav:
+  - Accueil: index.md
+  - Financial Markets:
+      - Vue d'ensemble: financial-markets/index.md
+      - 1. Actifs & marchés: financial-markets/01-actifs-et-marches.md
+      - 2. Microstructure & trading: financial-markets/02-microstructure-trading.md
+      - 3. Gestion & positions: financial-markets/03-gestion-positions.md
+      - 4. Indices & ETF: financial-markets/04-indices-etf.md
+      - 5. Analyse fondamentale & technique: financial-markets/05-analyse-fondamentale-technique.md
+      - 6. Efficience & finance comportementale: financial-markets/06-efficience-comportementale.md
+      - 7. Finance durable & ESG: financial-markets/07-finance-durable-esg.md
+  - Financing & Financial Securities:
+      - Vue d'ensemble: financing/index.md
+      - 1. Investissements & financement: financing/01-investissements-financement.md
+      - 2. Structure de capital (Modigliani-Miller): financing/02-modigliani-miller.md
+      - 3. Fixed Income (obligations): financing/03-fixed-income.md
+      - 4. Actions (Stocks): financing/04-stocks.md
+      - 5. Options: financing/05-options.md
+  - Portfolio Management:
+      - Vue d'ensemble: portfolio-management/index.md
+      - 1. Mesure du rendement: portfolio-management/01-mesure-rendement.md
+      - 2. Rendements ajustés au risque: portfolio-management/02-rendements-ajustes-risque.md
+      - 3. Frontière efficiente, CAL & CML: portfolio-management/03-frontiere-cal-cml.md
+  - Corporate Valuation:
+      - Vue d'ensemble: corporate-valuation/index.md
+      - 1. DCF multi-étapes (FCFF): corporate-valuation/01-dcf-multietapes.md
+      - 2. Multiples & comparables: corporate-valuation/02-multiples-comparables.md
+      - 3. Création de valeur (EVA & MVA): corporate-valuation/03-eva-mva.md

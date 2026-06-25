@@ -1,6 +1,6 @@
 name: Déploiement du site
 
-   on:
+on:
      push:
        branches:
          - main
